@@ -10,6 +10,7 @@ declare module "http" {
   }
 }
 
+// Body parsing middleware
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -20,6 +21,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Logging utility
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -31,6 +33,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -57,47 +60,35 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize routes - must be synchronous for Vercel
-let isInitialized = false;
+// Initialize routes synchronously (required for serverless)
+registerRoutes(app);
 
-function initializeApp() {
-  if (isInitialized) return;
+// Error handling middleware (must be after routes)
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
 
-  // Register routes without httpServer (not needed for serverless)
-  registerRoutes(app);
+  console.error("Internal Server Error:", err);
 
-  // Error handler
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    return res.status(status).json({ message });
-  });
-
-  // Serve static files in production
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
+  if (res.headersSent) {
+    return next(err);
   }
 
-  isInitialized = true;
+  return res.status(status).json({ message });
+});
+
+// Serve static files in production
+if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  serveStatic(app);
 }
 
-// Initialize immediately for serverless
-initializeApp();
-
-// For local development only
+// Local development server (only runs when executed directly)
 if (require.main === module) {
   const port = parseInt(process.env.PORT || "5000", 10);
   app.listen(port, () => {
-    log(`serving on port ${port}`);
+    log(`Server running on port ${port}`);
   });
 }
 
-// Export the Express app for Vercel
+// Export the Express app for Vercel serverless
 export default app;
