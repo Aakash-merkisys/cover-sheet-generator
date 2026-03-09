@@ -2,6 +2,13 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 
+// Extend Express Request type to include rawBody
+declare module "http" {
+  interface IncomingMessage {
+    rawBody: unknown;
+  }
+}
+
 // Logging utility
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -18,13 +25,7 @@ export function log(message: string, source = "express") {
 function createApp() {
   const app = express();
 
-  declare module "http" {
-    interface IncomingMessage {
-      rawBody: unknown;
-    }
-  }
-
-  // Body parsing middleware   
+  // Body parsing middleware
   app.use(
     express.json({
       verify: (req, _res, buf) => {
