@@ -1,19 +1,12 @@
 import express, { type Express } from "express";
-import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
+  // In the bundled code, __dirname will be the dist folder
+  // So we need to go to the 'public' subfolder
+  const distPath = path.join(__dirname, "public");
 
-  // Check if dist directory exists
-  if (!fs.existsSync(distPath)) {
-    console.warn(
-      `Build directory not found at: ${distPath}. Static files will not be served.`,
-    );
-    return;
-  }
-
-  console.log(`Serving static files from: ${distPath}`);
+  console.log(`[Static] Attempting to serve from: ${distPath}`);
 
   // Serve static files with proper caching headers
   app.use(express.static(distPath, {
@@ -29,11 +22,13 @@ export function serveStatic(app: Express) {
       return next();
     }
 
-    const indexPath = path.resolve(distPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send("Application not found");
-    }
+    // Try to serve index.html for SPA routing
+    const indexPath = path.join(distPath, "index.html");
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error(`[Static] Failed to serve index.html:`, err.message);
+        res.status(404).send("Application not found");
+      }
+    });
   });
 }
