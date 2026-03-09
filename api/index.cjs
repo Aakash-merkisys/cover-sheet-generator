@@ -1,5 +1,5 @@
 // Vercel Serverless Function Entry Point
-// This file loads and invokes the Express app handler
+// This file uses CommonJS (.cjs extension) to work with package.json "type": "module"
 
 module.exports = (req, res) => {
     try {
