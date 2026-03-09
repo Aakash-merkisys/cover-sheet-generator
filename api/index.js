@@ -1,17 +1,26 @@
 // Vercel Serverless Function Entry Point
-// This file uses CommonJS (.cjs extension) to work with package.json "type": "module"
+// Using ES module syntax to work with package.json "type": "module"
 
-module.exports = (req, res) => {
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
+
+export default function handler(req, res) {
     try {
         // Load the handler function from the built bundle
-        const handler = require('../dist/index.cjs');
+        const appPath = join(__dirname, '..', 'dist', 'index.cjs');
+        const appModule = require(appPath);
 
         // The handler could be exported as default or as a named export
-        const handlerFn = handler.default || handler;
+        const handlerFn = appModule.default || appModule;
 
         if (typeof handlerFn !== 'function') {
             console.error('Handler is not a function. Type:', typeof handlerFn);
-            console.error('Available exports:', Object.keys(handler));
+            console.error('Available exports:', Object.keys(appModule));
             throw new Error('Invalid handler export');
         }
 
@@ -31,4 +40,4 @@ module.exports = (req, res) => {
             });
         }
     }
-};
+}
