@@ -1,1 +1,1 @@
-Trigger deployment: 2026-03-09 22:10 - Fixed static file paths and added debug logging
+Trigger deployment: 2026-03-09 22:20 - Added path fallbacks and error handling

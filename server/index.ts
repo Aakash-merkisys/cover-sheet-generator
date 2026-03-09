@@ -67,8 +67,13 @@ registerRoutes(app);
 
 // Serve static files (for SPA fallback)
 // On Vercel, this serves the React app for non-API routes
-if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-  serveStatic(app);
+try {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    serveStatic(app);
+  }
+} catch (error) {
+  console.error("Failed to setup static file serving:", error);
+  // Continue without static files - API routes will still work
 }
 
 // Error handling middleware (must be after routes and static files)
