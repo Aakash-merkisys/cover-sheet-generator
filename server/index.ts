@@ -1,10 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
-import { createServer } from "http";
 
 const app = express();
-const httpServer = createServer(app);
 
 declare module "http" {
   interface IncomingMessage {
@@ -59,14 +57,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize routes synchronously for Vercel
+// Initialize routes - must be synchronous for Vercel
 let isInitialized = false;
 
-async function initializeApp() {
+function initializeApp() {
   if (isInitialized) return;
 
-  await registerRoutes(httpServer, app);
+  // Register routes without httpServer (not needed for serverless)
+  registerRoutes(app);
 
+  // Error handler
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -80,34 +80,24 @@ async function initializeApp() {
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Serve static files in production
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
   }
 
   isInitialized = true;
 }
 
-// For local development
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-  initializeApp().then(() => {
-    const port = parseInt(process.env.PORT || "5000", 10);
-    httpServer.listen(port, () => {
-      log(`serving on port ${port}`);
-    });
+// Initialize immediately for serverless
+initializeApp();
+
+// For local development only
+if (require.main === module) {
+  const port = parseInt(process.env.PORT || "5000", 10);
+  app.listen(port, () => {
+    log(`serving on port ${port}`);
   });
 }
 
-// For Vercel: wrap app to ensure initialization
-const handler = async (req: any, res: any) => {
-  await initializeApp();
-  return app(req, res);
-};
-
-// Export for Vercel serverless
-export default handler;
+// Export the Express app for Vercel
+export default app;

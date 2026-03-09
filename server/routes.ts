@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
 import multer from "multer";
 import * as xlsx from "xlsx";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
@@ -9,10 +8,7 @@ import { api } from "@shared/routes";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
+export function registerRoutes(app: Express): void {
 
   app.post(api.coversheets.generate.path, upload.single("file"), async (req, res) => {
     try {
@@ -41,8 +37,7 @@ export async function registerRoutes(
 
       const zip = new JSZip();
 
-      // Create a template placeholder image (a simple 1x1 gray pixel PNG) 
-      // in a real scenario we'd load this from disk or S3
+      // Create a template placeholder image (a simple 1x1 gray pixel PNG)
       const templateImageBytes = Buffer.from(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mM8c+bMfwYAAcQByN4c5P4AAAAASUVORK5CYII=",
         "base64"
@@ -62,7 +57,7 @@ export async function registerRoutes(
           y: 0,
           width: 600,
           height: 800,
-          opacity: 0.1 // Just a faint background
+          opacity: 0.1
         });
 
         // Overlay text
@@ -223,6 +218,4 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to generate template preview." });
     }
   });
-
-  return httpServer;
 }

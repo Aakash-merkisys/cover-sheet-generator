@@ -1,16 +1,8 @@
 // Vercel serverless function entry point
-module.exports = async (req, res) => {
-    try {
-        // Import the handler from the built server
-        const handler = require('../dist/index.cjs').default;
+module.exports = (req, res) => {
+    // Import the Express app from the built server
+    const app = require('../dist/index.cjs').default || require('../dist/index.cjs');
 
-        // Call the handler
-        return await handler(req, res);
-    } catch (error) {
-        console.error('Serverless function error:', error);
-        res.status(500).json({
-            error: 'Internal Server Error',
-            message: error.message
-        });
-    }
+    // Handle the request with Express
+    return app(req, res);
 };
