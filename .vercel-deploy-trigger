@@ -1,1 +1,1 @@
-Trigger deployment: 2026-03-09 22:20 - Added path fallbacks and error handling
+Trigger deployment: 2026-03-09 22:30 - Fixed ES module conflict by renaming to .cjs
