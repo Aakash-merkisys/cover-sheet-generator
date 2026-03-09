@@ -68,8 +68,7 @@ function createApp() {
   registerRoutes(app);
 
   // Serve static files (for SPA fallback)
-  // On Vercel, this serves the React app for non-API routes
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL || process.env.RENDER) {
     try {
       serveStatic(app);
     } catch (error) {
@@ -95,12 +94,16 @@ function createApp() {
   return app;
 }
 
-// Only start an HTTP server in local development, NOT on Vercel
-if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+// Start HTTP server for traditional hosting (Render, Railway, etc.)
+// Skip only on Vercel (serverless)
+if (!process.env.VERCEL) {
   const app = createApp();
-  const port = Number(process.env.PORT || 5000);
-  app.listen(port, () => {
-    log(`Local server listening on port ${port}`);
+  const PORT = process.env.PORT || 5000;
+
+  app.listen(PORT, () => {
+    log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Platform: ${process.env.RENDER ? 'Render' : 'Local'}`);
   });
 }
 
