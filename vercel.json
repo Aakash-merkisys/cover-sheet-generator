@@ -2,12 +2,6 @@
     "version": 2,
     "buildCommand": "npm run build",
     "installCommand": "npm install",
-    "functions": {
-        "api/index.cjs": {
-            "maxDuration": 30,
-            "memory": 1024
-        }
-    },
     "routes": [
         {
             "src": "/(.*)",
