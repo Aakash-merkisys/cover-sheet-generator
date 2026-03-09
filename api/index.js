@@ -1,30 +1,19 @@
 // Vercel Serverless Function Entry Point
-const path = require('path');
+// This file acts as the adapter between Vercel's serverless environment and our Express app
 
-// Cache the app instance
-let app = null;
+// Import the built Express app
+const appModule = require('../dist/index.cjs');
+const app = appModule.default || appModule;
 
-module.exports = async (req, res) => {
-    try {
-        // Load app only once (cached after first invocation)
-        if (!app) {
-            const appPath = path.join(__dirname, '..', 'dist', 'index.cjs');
-            const appModule = require(appPath);
-            app = appModule.default || appModule;
+// Verify app loaded correctly
+if (!app || typeof app !== 'function') {
+    console.error('Failed to load Express app from dist/index.cjs');
+    console.error('App module:', appModule);
+    throw new Error('Express app not found or invalid');
+}
 
-            console.log('Express app loaded successfully');
-        }
+console.log('✓ Express app loaded successfully for Vercel serverless');
 
-        // Handle the request
-        return app(req, res);
-    } catch (error) {
-        console.error('Serverless function error:', error);
-
-        // Return detailed error for debugging
-        return res.status(500).json({
-            error: 'Internal Server Error',
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-};
+// Export the Express app as the serverless function handler
+// Vercel will call this function for each request
+module.exports = app;

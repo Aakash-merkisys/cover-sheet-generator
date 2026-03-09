@@ -4,16 +4,36 @@ import path from "path";
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "public");
+
+  // Check if dist directory exists
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+    console.warn(
+      `Build directory not found at: ${distPath}. Static files will not be served.`,
     );
+    return;
   }
 
-  app.use(express.static(distPath));
+  console.log(`Serving static files from: ${distPath}`);
 
-  // fall through to index.html if the file doesn't exist
-  app.use("/{*path}", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Serve static files with proper caching headers
+  app.use(express.static(distPath, {
+    maxAge: process.env.NODE_ENV === 'production' ? '1y' : 0,
+    etag: true,
+    lastModified: true,
+  }));
+
+  // SPA fallback - serve index.html for all non-API routes
+  app.get("*", (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
+
+    const indexPath = path.resolve(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Application not found");
+    }
   });
 }
