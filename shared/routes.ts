@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { generateResponseSchema } from './schema';
+import { generateResponseSchema, parseResponseSchema } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -16,6 +16,15 @@ export const errorSchemas = {
 
 export const api = {
   coversheets: {
+    parse: {
+      method: 'POST' as const,
+      path: '/api/parse' as const,
+      responses: {
+        200: parseResponseSchema,
+        400: errorSchemas.validation,
+        500: errorSchemas.internal,
+      },
+    },
     generate: {
       method: 'POST' as const,
       path: '/api/generate' as const,
@@ -24,7 +33,13 @@ export const api = {
         400: errorSchemas.validation,
         500: errorSchemas.internal,
       },
-    }
+    },
+  },
+  templates: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/templates' as const,
+    },
   },
 };
 

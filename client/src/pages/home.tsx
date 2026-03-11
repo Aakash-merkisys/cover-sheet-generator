@@ -1,26 +1,27 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGenerateCoversheets } from "@/hooks/use-generate";
+import { useGenerateCoversheets, useParseExcel, useTemplates } from "@/hooks/use-generate";
 import { FileUpload } from "@/components/file-upload";
 import { StepIndicator } from "@/components/step-indicator";
 import { ExcelFormatGuide } from "@/components/excel-format-guide";
-import { TemplatePreview } from "@/components/template-preview";
 import { ProgressIndicator } from "@/components/progress-indicator";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Download,
-  Layers,
-  CheckCircle2,
-  FileText,
-  AlertCircle,
-  Sparkles
+  Download, Layers, CheckCircle2, FileText, AlertCircle, Sparkles, Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { ExcelRecord } from "@shared/schema";
 
 const STEPS = [
-  { number: 1, title: "Upload Excel" },
-  { number: 2, title: "Generate Coversheets" },
-  { number: 3, title: "Download ZIP" },
+  { number: 1, title: "Upload Data" },
+  { number: 2, title: "Configure & Select" },
+  { number: 3, title: "Download" },
 ];
 
 export default function Home() {
@@ -29,26 +30,23 @@ export default function Home() {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const { toast } = useToast();
 
+  const [records, setRecords] = useState<ExcelRecord[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
+  const [templateId, setTemplateId] = useState<string>("template-1");
+  const [revisionMode, setRevisionMode] = useState<"all" | "latest">("latest");
+
+  const { mutate: parseExcel, isPending: isParsing } = useParseExcel();
   const {
     mutate: generate,
-    isPending,
-    data,
+    isPending: isGenerating,
+    data: genData,
     reset,
     error
   } = useGenerateCoversheets();
+  const { data: templates = [], isLoading: isLoadingTemplates } = useTemplates();
 
   useEffect(() => {
-    if (file) {
-      setCurrentStep(2);
-    } else if (!isPending && !data) {
-      setCurrentStep(1);
-    }
-  }, [file, isPending, data]);
-
-  useEffect(() => {
-    if (isPending) {
-      // Simulate progress for demo purposes
-      // In production, this would come from the backend
+    if (isGenerating || isParsing) {
       const interval = setInterval(() => {
         setProgress(prev => {
           if (prev.total === 0) return { current: 0, total: 50 };
@@ -62,16 +60,48 @@ export default function Home() {
     } else {
       setProgress({ current: 0, total: 0 });
     }
-  }, [isPending]);
+  }, [isGenerating, isParsing]);
 
   useEffect(() => {
-    if (data) {
+    if (genData) {
       setCurrentStep(3);
     }
-  }, [data]);
+  }, [genData]);
+
+  // Load template id initially
+  useEffect(() => {
+    if (templates.length > 0 && templateId === "template-1") {
+      setTemplateId(templates[0].id);
+    }
+  }, [templates]);
+
+  const handleParse = () => {
+    if (!file) {
+      setRecords([]);
+      setSelectedIndices([]);
+      setCurrentStep(2);
+      return;
+    }
+
+    parseExcel(file, {
+      onSuccess: (data) => {
+        setRecords(data.records);
+        setSelectedIndices(data.records.map((_, i) => i)); // select all initially
+        setFile(null);
+        setCurrentStep(2);
+      },
+      onError: (err) => {
+        toast({
+          title: "Parse Failed",
+          description: err.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
 
   const handleGenerate = () => {
-    generate(file, {
+    generate({ selectedIndices, templateId, revisionMode, records }, {
       onError: (err) => {
         toast({
           title: "Generation Failed",
@@ -86,17 +116,32 @@ export default function Home() {
   const handleReset = () => {
     reset();
     setFile(null);
+    setRecords([]);
+    setSelectedIndices([]);
     setCurrentStep(1);
     setProgress({ current: 0, total: 0 });
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIndices.length === records.length) {
+      setSelectedIndices([]);
+    } else {
+      setSelectedIndices(records.map((_, i) => i));
+    }
+  };
+
+  const toggleSelectRow = (idx: number) => {
+    setSelectedIndices(prev =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  };
+
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 md:p-8 overflow-hidden bg-background bg-grid-pattern">
-      {/* Decorative blurred blobs */}
       <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
 
-      <main className="relative z-10 w-full max-w-[600px]">
+      <main className="relative z-10 w-full max-w-[800px]">
         {/* Header */}
         <div className="text-center mb-8">
           <motion.div
@@ -136,7 +181,7 @@ export default function Home() {
           <StepIndicator currentStep={currentStep} steps={STEPS} />
 
           <AnimatePresence mode="wait">
-            {isPending ? (
+            {isGenerating || isParsing ? (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -149,8 +194,7 @@ export default function Home() {
                   total={progress.total}
                 />
               </motion.div>
-
-            ) : data ? (
+            ) : genData ? (
               <motion.div
                 key="success"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -170,7 +214,7 @@ export default function Home() {
 
                 <h3 className="text-3xl font-bold font-display text-foreground mb-3 flex items-center justify-center gap-2">
                   <CheckCircle2 className="w-7 h-7 text-green-600" />
-                  {data.count} Coversheets Generated
+                  {genData.count} Coversheets Generated
                 </h3>
                 <p className="text-muted-foreground text-base mb-8">
                   Your documents have been successfully generated and packaged into a secure ZIP archive.
@@ -182,7 +226,7 @@ export default function Home() {
                     size="lg"
                     className="w-full text-base h-14 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
                   >
-                    <a href={data.downloadUrl} download>
+                    <a href={genData.downloadUrl} download>
                       <Download className="w-5 h-5 mr-2" />
                       Download Coversheets ZIP
                     </a>
@@ -198,10 +242,9 @@ export default function Home() {
                   </Button>
                 </div>
               </motion.div>
-
-            ) : (
+            ) : currentStep === 2 ? (
               <motion.div
-                key="form"
+                key="configure"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
@@ -217,9 +260,112 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Template Preview */}
-                <TemplatePreview />
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-primary" />
+                    Filter & Configure
+                  </h3>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Template Selection */}
+                    <div className="space-y-2">
+                      <Label>Customer Template</Label>
+                      <Select value={templateId} onValueChange={setTemplateId} disabled={isLoadingTemplates}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templates.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name} ({t.customer})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Revision Mode */}
+                    <div className="space-y-2">
+                      <Label>Revision Mode</Label>
+                      <RadioGroup value={revisionMode} onValueChange={(val: any) => setRevisionMode(val)} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="latest" id="r-latest" />
+                          <Label htmlFor="r-latest">Latest Only</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="all" id="r-all" />
+                          <Label htmlFor="r-all">All Revisions</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </div>
+
+                  {/* Records Table */}
+                  <div className="border rounded-md mt-6 overflow-hidden">
+                    <ScrollArea className="h-[300px] w-full">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-secondary z-10">
+                          <TableRow>
+                            <TableHead className="w-[50px]">
+                              <Checkbox
+                                checked={selectedIndices.length === records.length && records.length > 0}
+                                onCheckedChange={toggleSelectAll}
+                              />
+                            </TableHead>
+                            <TableHead>Document ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Rev</TableHead>
+                            <TableHead>Rev Desc</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {records.map((r, i) => (
+                            <TableRow key={i}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedIndices.includes(i)}
+                                  onCheckedChange={() => toggleSelectRow(i)}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{r.ID || "-"}</TableCell>
+                              <TableCell>{r.Name || "-"}</TableCell>
+                              <TableCell>{r.Revision ?? "-"}</TableCell>
+                              <TableCell className="max-w-[150px] truncate" title={String(r.RevisionDescription || "")}>
+                                {r.RevisionDescription || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                  <div className="text-sm text-muted-foreground text-right mt-1">
+                    {selectedIndices.length} / {records.length} selected
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-border flex justify-between gap-4">
+                  <Button variant="outline" onClick={() => setCurrentStep(1)} className="w-1/3 text-base h-14">
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleGenerate}
+                    size="lg"
+                    className="w-2/3 text-base h-14 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
+                    disabled={selectedIndices.length === 0}
+                  >
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Generate Coversheets
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-6"
+              >
                 {/* Upload Section */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -227,9 +373,6 @@ export default function Home() {
                       <FileText className="w-5 h-5 text-primary" />
                       Upload Data Source
                     </h3>
-                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground">
-                      Optional
-                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
                     Upload an Excel file with your data, or leave empty to test with sample records.
@@ -240,15 +383,15 @@ export default function Home() {
                 {/* Excel Format Guide */}
                 <ExcelFormatGuide />
 
-                {/* Generate Button */}
+                {/* Process Button */}
                 <div className="pt-4 border-t border-border">
                   <Button
-                    onClick={handleGenerate}
+                    onClick={handleParse}
                     size="lg"
                     className="w-full text-base h-14 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
                   >
                     <Sparkles className="w-5 h-5 mr-2" />
-                    Generate Coversheets
+                    Next Step
                   </Button>
                 </div>
               </motion.div>

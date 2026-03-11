@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { setupVite } from "./vite";
+import http from "http";
 
 // Extend Express Request type to include rawBody
 declare module "http" {
@@ -67,30 +69,6 @@ function createApp() {
   // Initialize routes
   registerRoutes(app);
 
-  // Serve static files (for SPA fallback)
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL || process.env.RENDER) {
-    try {
-      serveStatic(app);
-    } catch (error) {
-      console.error("Failed to setup static file serving:", error);
-      // Continue without static files - API routes will still work
-    }
-  }
-
-  // Error handling middleware (must be after routes and static files)
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    return res.status(status).json({ message });
-  });
-
   return app;
 }
 
@@ -98,12 +76,40 @@ function createApp() {
 // Skip only on Vercel (serverless)
 if (!process.env.VERCEL) {
   const app = createApp();
+  const server = http.createServer(app);
   const PORT = process.env.PORT || 5000;
 
-  app.listen(PORT, () => {
-    log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Platform: ${process.env.RENDER ? 'Render' : 'Local'}`);
+  const startServer = async () => {
+    if (process.env.NODE_ENV === "production" || process.env.RENDER) {
+      try {
+        serveStatic(app);
+      } catch (error) {
+        console.error("Failed to setup static file serving:", error);
+      }
+    } else {
+      // In development, setup Vite!
+      await setupVite(server, app);
+    }
+
+    // Error handling middleware (must be after all routes and Vite)
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      console.error("Internal Server Error:", err);
+      if (res.headersSent) return next(err);
+      return res.status(status).json({ message });
+    });
+
+    server.listen(PORT, () => {
+      log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Platform: ${process.env.RENDER ? 'Render' : 'Local'}`);
+    });
+  };
+
+  startServer().catch((err) => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
   });
 }
 
