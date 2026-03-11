@@ -1,6 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// Get directory name safely - works in both ESM and when bundled
+function getDirname(): string {
+  if (typeof import.meta !== 'undefined' && import.meta.dirname) {
+    return import.meta.dirname;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.url) {
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+  if (typeof __dirname !== 'undefined') {
+    return __dirname;
+  }
+  return process.cwd();
+}
+
+const dirname = getDirname();
 
 export default defineConfig({
   plugins: [
@@ -8,14 +25,14 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@": path.resolve(dirname, "client", "src"),
+      "@shared": path.resolve(dirname, "shared"),
+      "@assets": path.resolve(dirname, "attached_assets"),
     },
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(dirname, "dist/public"),
     emptyOutDir: true,
   },
   server: {
