@@ -4,24 +4,9 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
-
-// Get the directory name safely
-function getDirname(): string {
-  // In ES modules with import.meta
-  if (typeof import.meta !== 'undefined' && import.meta.url) {
-    return path.dirname(fileURLToPath(import.meta.url));
-  }
-  // In CommonJS with __dirname
-  if (typeof __dirname !== 'undefined') {
-    return __dirname;
-  }
-  // Fallback to current working directory
-  return process.cwd();
-}
 
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
@@ -50,17 +35,15 @@ export async function setupVite(server: Server, app: Express) {
     const url = req.originalUrl;
 
     try {
-      // Get the base directory safely
-      const dirname = getDirname();
-
-      // Resolve the client template path
+      // Use process.cwd() as base - it's always defined
+      // Resolve the client template path relative to project root
       const clientTemplate = path.resolve(
-        dirname,
-        "..",
+        process.cwd(),
         "client",
         "index.html",
       );
 
+      console.log(`[Vite] Working directory: ${process.cwd()}`);
       console.log(`[Vite] Loading template from: ${clientTemplate}`);
 
       // always reload the index.html file from disk incase it changes

@@ -1,16 +1,13 @@
 import express, { type Express } from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 
 export function serveStatic(app: Express) {
-  // In the bundled code, __dirname will be the dist folder
-  // So we need to go to the 'public' subfolder
-  // Ensure __dirname is defined (it should be in CommonJS bundle)
-  const baseDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
-  const distPath = path.join(baseDir, "public");
+  // Use process.cwd() as base - it's always defined
+  // In production, the built files are in dist/public relative to project root
+  const distPath = path.resolve(process.cwd(), "dist", "public");
 
-  console.log(`[Static] Base directory: ${baseDir}`);
-  console.log(`[Static] Attempting to serve from: ${distPath}`);
+  console.log(`[Static] Working directory: ${process.cwd()}`);
+  console.log(`[Static] Serving static files from: ${distPath}`);
 
   // Serve static files with proper caching headers
   app.use(express.static(distPath, {
@@ -27,7 +24,7 @@ export function serveStatic(app: Express) {
     }
 
     // Try to serve index.html for SPA routing
-    const indexPath = path.join(distPath, "index.html");
+    const indexPath = path.resolve(distPath, "index.html");
     res.sendFile(indexPath, (err) => {
       if (err) {
         console.error(`[Static] Failed to serve index.html:`, err.message);
